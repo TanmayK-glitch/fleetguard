@@ -1,0 +1,15 @@
+seed: 42
+paths:
+  raw: data/raw
+  processed: data/processed
+  incoming: data/incoming
+cleaning:
+  smoothing: ewma         # ewma or rolling_median, both trailing only
+  ewma_alpha: 0.3
+  median_window: 5
+  min_sensor_std: 0.01    # measured on cleaned TRAIN sensors in original units
+features:
+  windows: [5, 10, 30]
+  baseline_cycles: 10     # prefix mean until this cycle, then frozen
+target:
+  rul_cap: 125

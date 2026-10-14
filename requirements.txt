@@ -1,0 +1,15 @@
+# Phase 1 only. Model and dashboard dependencies are added in their phases.
+numpy==2.2.6
+pandas==2.2.3
+PyYAML==6.0.2
+pytest==8.3.5
+# Pin transitive runtime/test dependencies too, for repeatable installations.
+colorama==0.4.6
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.6.0
+python-dateutil==2.9.0.post0
+pytz==2026.5
+six==1.17.0
+tzdata==2026.5
+tomli==2.2.1; python_version < "3.11"
