@@ -1,1 +1,1 @@
-"""RUL and anomaly models will be implemented in later phases."""
+"""Engine-safe RUL baselines and metrics; anomaly detection comes in Phase 3."""

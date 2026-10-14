@@ -5,10 +5,10 @@ A student-friendly, CPU-only predictive maintenance project using
 The planned flow is sensors → cleaning/features → RUL and anomaly models →
 plain Python triage rules → maintenance work orders.
 
-**Implemented through Phase 1:** FD001 loading, data checks, causal cleaning,
-training-only sensor selection/scaling, rolling features, capped training RUL,
-saved preprocessing state, and pytest tests. Models, agents, tracking and the
-dashboard are later phases. No ML accuracy metrics exist yet.
+**Implemented through Phase 2:** FD001 loading, causal preprocessing/features,
+Ridge/RandomForest/LightGBM RUL models, engine-grouped validation, last-cycle test
+evaluation, saved models, local experiment reports and pytest tests. Anomaly
+detection, maintenance rules, MLflow and the dashboard are later phases.
 
 ## Setup
 
@@ -30,8 +30,9 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Phase 1 uses NumPy, pandas, PyYAML and pytest. Direct and transitive dependencies
-are pinned; model/tracking/dashboard dependencies are deferred to their phases.
+Phase 1 uses NumPy, pandas, PyYAML and pytest. Phase 2 adds the approved
+scikit-learn/LightGBM stack. Direct and transitive dependencies are pinned;
+tracking/dashboard dependencies are deferred to their phases.
 
 ## Run Phase 1
 
@@ -48,8 +49,8 @@ On Linux/macOS, replace `.\.venv\Scripts\python.exe` with `.venv/bin/python`.
 With an active environment you can also use `make data` and `make test`.
 
 The CLI resolves configured relative paths against the repo root. Use
-`--config configs/base.yaml` to select a config. `train`, `agent`, `all`, and
-non-FD001 preprocessing stop with an explicit message until their phases exist.
+`--config configs/base.yaml` to select a config. `agent`, `all`, and non-FD001
+preprocessing/training stop with an explicit message until their phases exist.
 
 ## What the data stage does
 
@@ -95,11 +96,115 @@ will select the last row per engine and join `test_rul.csv` by `unit`; test labe
 remain uncapped. Artifacts and raw data are excluded from Git, but empty data
 directories are kept.
 
-**Phase 2 validation requirement:** split raw engines using GroupKFold, fit a new
-`SensorPreprocessor` on each fold's training engines, then transform its validation
-engines. The exported train feature CSV is fitted on all training engines and must
-not be used directly for cross-validation. Frozen train-fitted statistics can
-use all training readings; causal features mean each transformed row's engine
-history uses only current and past cycles under that frozen state.
+**Phase 2 implements fold-local preprocessing:** it splits raw engines using
+GroupKFold, fits a new `SensorPreprocessor` on each fold's training engines, then
+transforms its validation engines. The exported Phase 1 feature CSV is fitted on
+all training engines and is not used for cross-validation. Frozen train-fitted
+statistics can use all training readings; causal features mean each transformed
+row's engine history uses only current and past cycles under that frozen state.
+
+## Run Phase 2
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe run_pipeline.py --subset FD001 --stage train
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+`--stage train` loads raw data itself; a preceding data-stage command is not
+required. The default uses five deterministic shuffled engine folds and two CPU
+workers. Each fold builds features once and reuses them for all three models.
+Rolling slopes use a vectorized covariance/variance formula, equivalent to the
+Phase 1 least-squares calculation, to keep repeated preprocessing lightweight.
+All model tuning settings live in `configs/base.yaml`.
+
+- **Ridge:** a simple linear relationship, with regularization to reduce large
+  coefficients. An additional scaler for engineered features is learned within
+  each training fold by its scikit-learn pipeline.
+- **RandomForest:** averages a collection of decision trees with bounded depth.
+- **LightGBM:** fits boosted trees, where each new tree addresses earlier errors.
+
+Model inputs exclude `unit`, `cycle`, and targets. Validation evaluates all
+held-out cycles against capped targets. The model with the lowest pooled
+out-of-fold RMSE is selected before any test scores are calculated. Each model is
+then refitted on all training engines and compared on the last observed cycle
+of each test engine, joining the official uncapped truth by engine ID.
+
+Outputs are clipped to `0..rul_cap` by default for all three models, configurable
+with `training.clip_predictions`. The official test labels are never clipped.
+This means engines with true test RUL above the training cap can still have
+substantial error even when the model correctly identifies a healthy engine.
+
+Metrics are RMSE and MAE in cycles, plus the summed NASA asymmetric score.
+Overestimating remaining life is penalized more strongly than underestimating
+it. Lower is better. NASA totals from validation and test cannot be compared
+directly: their sample counts and target definitions differ. No test-driven
+parameter search or early stopping is performed.
+
+## Phase 2 artifacts
+
+Files in `artifacts/reports/FD001/`:
+
+| File | Contents |
+| --- | --- |
+| `metrics.json` | All model parameters/metrics, selected model, config, versions, input hashes and timing |
+| `metrics.md` | Readable table of all three validation and test metrics |
+| `fold_metrics.csv` | Metrics and timing for each model/fold |
+| `fold_audit.json` | Training/validation engine IDs and fitted sensor preprocessing state per fold |
+| `oof_predictions.csv` | Exactly one held-out prediction per training row/model, with capped truth |
+| `test_predictions.csv` | Predictions for every observed test cycle/model, without test targets |
+| `test_last_cycle_predictions.csv` | One test row per engine/model with the uncapped official truth |
+
+Files in `artifacts/models/FD001/`:
+
+| File | Contents |
+| --- | --- |
+| `ridge.joblib` | Fitted Ridge model plus preprocessing, feature order and configuration |
+| `random_forest.joblib` | The same bundle for RandomForest |
+| `lightgbm.joblib` | The same bundle for LightGBM |
+| `preprocessor.json` | Final sensor preprocessing fitted on all training engines |
+| `metadata.json` | Selected model name, feature order, config and environment |
+
+These local outputs are ignored by Git and replaced when the same subset is run
+again. Local files record all three experiments; MLflow runs/registry and model
+version management are Phase 4. Model bundles contain Python objects: use the
+locally generated files and the matching pinned environment for reloading.
+
+For example, after training, load the selected bundle in Python:
+
+```python
+import json
+from pathlib import Path
+import joblib
+from src.data.load import load_subset
+
+folder = Path("artifacts/models/FD001")
+metadata = json.loads((folder / "metadata.json").read_text())
+predictor = joblib.load(folder / f"{metadata['selected_model']}.joblib")
+raw_test = load_subset(Path("data/raw"), "FD001").test
+predictions = predictor.predict(raw_test)  # full histories from cycle 1
+```
+
+With an active environment, `make train` is the equivalent training shortcut.
+
+## Verified Phase 2 result
+
+The supplied FD001 files and default YAML produced these actual results:
+
+| Model | Pooled CV RMSE | Test RMSE | Test MAE | Test NASA score |
+| --- | ---: | ---: | ---: | ---: |
+| Ridge | 15.614 | 16.184 | 13.041 | 390.200 |
+| RandomForest | 11.737 | 13.398 | 9.939 | 261.450 |
+| LightGBM | 11.896 | 14.520 | 11.185 | 299.863 |
+
+RandomForest was selected by CV RMSE. Test evaluation covered all 100 engines
+with uncapped official RUL ranging from 7 to 145 cycles. The run took 777.4 seconds
+(about 13 minutes) in this workspace with two CPU workers; runtime depends on
+hardware. All 60 tests passed. The extra real-data audit verified train-only fold
+statistics, held-out engine membership, last-cycle/label alignment, recomputed
+metrics, saved inference and causal prediction prefixes. The result slightly
+below the spec's rough RMSE range passed those checks; no test-driven tuning was
+performed. See `artifacts/reports/FD001/metrics.md` for all three metrics on both
+validation and test, and `metrics.json` for unrounded values and run provenance.
 
 See [DESIGN.md](DESIGN.md) for a plain-English explanation of every source file.

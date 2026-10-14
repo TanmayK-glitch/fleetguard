@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .pytest_tmp/
+artifacts/
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*

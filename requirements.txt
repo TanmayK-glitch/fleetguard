@@ -1,4 +1,4 @@
-# Phase 1 only. Model and dashboard dependencies are added in their phases.
+# Through Phase 2. Tracking and dashboard dependencies come in later phases.
 numpy==2.2.6
 pandas==2.2.3
 PyYAML==6.0.2
@@ -13,3 +13,9 @@ pytz==2026.5
 six==1.17.0
 tzdata==2026.5
 tomli==2.2.1; python_version < "3.11"
+# Approved Phase 2 model stack.
+scikit-learn==1.7.2
+lightgbm==4.6.0
+scipy==1.15.3
+joblib==1.5.2
+threadpoolctl==3.6.0

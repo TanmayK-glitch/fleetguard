@@ -4,17 +4,16 @@ import numpy as np
 import pandas as pd
 
 
-def _slope(values: np.ndarray) -> float:
-    """Least-squares slope per cycle for consecutive observations.
+def _rolling_slopes(values: pd.DataFrame, window: int) -> pd.DataFrame:
+    """Compute least-squares slope as covariance(value, cycle)/variance(cycle).
 
-    Centering the positions makes this formula easy to read and numerically
-    stable. A single observation has zero slope by convention.
+    pandas computes all trailing windows at once, avoiding a Python callback
+    for every sensor/window/row. One observation has zero slope by convention.
     """
-    if len(values) == 1:
-        return 0.0
-    positions = np.arange(len(values), dtype=float)
-    centered = positions - positions.mean()
-    return float(np.dot(centered, values - values.mean()) / np.dot(centered, centered))
+    positions = pd.Series(np.arange(len(values), dtype=float), index=values.index)
+    covariance = values.rolling(window, min_periods=1).cov(positions, ddof=0)
+    variance = positions.rolling(window, min_periods=1).var(ddof=0)
+    return covariance.div(variance.replace(0., np.nan), axis=0).fillna(0.)
 
 
 def build_features(
@@ -48,7 +47,7 @@ def build_features(
             blocks.extend([
                 rolling.mean().add_suffix(f"_mean_{window}"),
                 rolling.std(ddof=0).add_suffix(f"_std_{window}"),
-                rolling.apply(_slope, raw=True).add_suffix(f"_slope_{window}"),
+                _rolling_slopes(values, window).add_suffix(f"_slope_{window}"),
             ])
         # Only already observed baseline readings contribute to earlier rows.
         baseline = values.iloc[:baseline_cycles].expanding(min_periods=1).mean()
