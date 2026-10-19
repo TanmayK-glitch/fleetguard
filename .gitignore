@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .pytest_tmp/
+.ipynb_checkpoints/
 artifacts/
 data/raw/*
 !data/raw/.gitkeep

@@ -207,4 +207,49 @@ below the spec's rough RMSE range passed those checks; no test-driven tuning was
 performed. See `artifacts/reports/FD001/metrics.md` for all three metrics on both
 validation and test, and `metrics.json` for unrounded values and run provenance.
 
+## Beginner walkthrough and viva preparation
+
+Open [notebooks/walkthrough.ipynb](notebooks/walkthrough.ipynb) in a notebook
+editor and select the project's `.venv` Python kernel. It is already executed,
+so its real tables and four plots are saved inline. Every code cell has a
+plain-English Markdown explanation immediately before it.
+
+The walkthrough loads FD001, fits/explains cleaning and scaling, builds causal
+features, plots the training RUL cap, demonstrates a live first-fold Ridge fit,
+checks the saved folds, compares the actual three-model report, reloads the
+selected model and recomputes last-cycle test metrics. It also plots predicted
+versus true RUL and the signed error histogram.
+
+From the repo root, execute all cells again and save their outputs with:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe scripts/execute_walkthrough.py
+```
+
+The helper uses the Python executable you invoked and a project-local kernel;
+no global kernel registration or notebook server installation is required.
+Notebook execution needs permission to start a local kernel and connect to its
+local sockets; in the Codex sandbox, this run needed outside-sandbox execution.
+Raw data and Phase 2 artifacts are required. If those artifacts are missing,
+first run the Phase 2 training command above. Missing or mismatched config/data
+produces an explicit error instead of invented results.
+
+`configs/walkthrough.yaml` controls the example engine/sensor, plotting window,
+bin count and figure settings. Full retraining is **off by default**; it reuses
+the saved comparison while fitting the live Ridge example. Set
+`rerun_full_training: true` only when you want to repeat the complete experiment.
+Plot exports are saved to `artifacts/notebooks/FD001/`:
+
+| File | What it illustrates |
+| --- | --- |
+| `sensor_raw_cleaned_rolling.png` | One training engine's raw, cleaned and trailing-mean readings, all in original sensor units |
+| `rul_cap.png` | The same engine's uncapped and capped training targets |
+| `predicted_vs_true_rul.png` | One last-cycle prediction per test engine with the ideal line and prediction cap |
+| `error_histogram.png` | Counts of engines by signed error: predicted RUL minus true RUL |
+
+Read [VIVA.md](VIVA.md) for 25 likely judge questions and short answers. It marks
+later anomaly/maintenance/MLOps/dashboard capabilities as planned, and connects
+the measured results to the saved experiment report.
+
 See [DESIGN.md](DESIGN.md) for a plain-English explanation of every source file.

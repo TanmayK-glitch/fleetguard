@@ -231,3 +231,64 @@ These checks found no leakage in the tested paths.
 Official test truth remained uncapped at 7..145 cycles. Measured training
 computation took 777.4 seconds with two CPU workers. This is a local runtime,
 not a promise for other hardware. Phase 3 has not been started.
+
+## Phase 1–2 teaching material
+
+The user requested a beginner walkthrough and viva preparation, not the next
+implementation phase. The notebook demonstrates the same tested functions as
+the CLI on real FD001 files. It fits a live Ridge example on one engine-separated
+fold and reuses the verified full comparison/model artifacts by default. A YAML
+flag permits an intentional complete rerun; it is off by default to avoid
+repeating the ~13-minute training experiment just to read the tutorial.
+
+Each of the 24 code cells is preceded by plain-English Markdown explaining
+what it will do and why. The notebook checks the saved run's config and raw-file
+hashes, compares its live fold against saved fold metrics, checks engine overlap,
+reloads the selected bundle and recomputes test metrics. Missing or mismatched
+inputs fail explicitly. Results are calculated or loaded from actual artifacts,
+not embedded as invented constants in notebook code.
+
+The raw/cleaned/rolling-mean plot reverses scaling for the two transformed curves,
+so all lines are in the same original sensor units. The RUL-cap chart uses one
+training engine's real lifespan. The scatter and histogram use one last-cycle
+prediction per test engine, with uncapped true labels and error defined as
+predicted minus true. Histogram ticks count whole engines; scatter axes include
+padding so boundary points remain visible. All four plots are saved inline and
+also exported as PNGs to the ignored artifact directory.
+
+The approved plotting/notebook libraries and their supporting dependencies are
+pinned in `requirements.txt`. Four automatically resolved supporting packages
+needed older compatible pins to preserve the project's Python 3.10 minimum;
+installed package metadata was checked for compatibility. No model parameters
+or Phase 2 results were changed.
+
+| New file | What it does and why |
+| --- | --- |
+| `notebooks/walkthrough.ipynb` | Executed, step-by-step FD001 tutorial for preprocessing, RUL training/validation and test evaluation, with four inline plots. |
+| `configs/walkthrough.yaml` | Presentation/example choices, plot dimensions/bin count, timeout and an explicit optional full-training switch. |
+| `scripts/execute_walkthrough.py` | Runs every cell with the invoking Python, saves outputs, validates Markdown-before-code structure and cleans up its project-local kernel. |
+| `VIVA.md` | Exactly 25 likely judge questions with concise answers grounded in the implemented project and measured run; later features are marked planned. |
+
+Existing README, requirements and `.gitignore` were updated for notebook usage,
+approved dependencies and notebook checkpoint exclusions. The temporary
+authoring helper and runtime/cache/PNG files live under ignored `artifacts/`;
+the notebook is the committed tutorial source. Every exported PNG is explained
+in the README notebook section.
+
+Actual final notebook execution completed all 24 code cells without errors and
+saved the four plots inline. The first sandbox attempt stalled at kernel startup
+and was stopped; authorized outside-sandbox execution succeeded using the same
+project `.venv`. Plot images were visually inspected for labels, units and layout.
+The viva numbering was checked to contain exactly questions 1 through 25.
+The existing regression suite also passed with the notebook stack installed:
+`60 passed, 13 warnings in 3.25s`. The warnings were third-party Matplotlib /
+Pyparsing deprecation messages, not cell errors or failed tests. Dependency
+checking reported `No broken requirements found.`
+
+Exact re-execution command from the repo root in PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/execute_walkthrough.py
+```
+
+This teaching-material task does not implement or start Phase 3.

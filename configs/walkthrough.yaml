@@ -1,0 +1,14 @@
+# Presentation choices only; model/preprocessing knobs remain in base.yaml.
+subset: FD001
+engine_id: 1
+sensor: sensor_2
+rolling_window: 10
+sample_rows: 5
+prefix_cycles: 20
+histogram_bins: 20
+figure_width: 11
+figure_height: 4.5
+figure_dpi: 120
+scatter_padding_fraction: 0.05
+rerun_full_training: false   # true repeats the complete ~13-minute Phase 2 run
+cell_timeout_seconds: 1800
